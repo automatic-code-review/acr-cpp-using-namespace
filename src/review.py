@@ -160,6 +160,9 @@ def review(config):
     comments = []
 
     for change in changes:
+        if change['deleted_file']:
+            continue
+
         new_path = change['new_path']
 
         if not new_path.endswith((".h", ".cpp", ".c", ".h")):
