@@ -144,11 +144,7 @@ def verify(path, regex_order):
 
 
 def ordered_to_string(ordered):
-    strings = []
-    for order in ordered:
-        strings.append(f"- `{order}`")
-
-    return "<br>".join(strings)
+    return "<pre>"+"".join([order.replace("\n", "<br>") for order in ordered[1:-1]])+"</pre>"
 
 
 def review(config):
