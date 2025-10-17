@@ -130,6 +130,9 @@ def verify(path, regex_order):
 
     usings = remove_duplicate_usings(usings)
 
+    if not usings:
+        return False, [], []
+
     pos_last_include = get_last_include_position(lines_fix) + 1
     usings_ordered = adjust_order(usings, regex_order)
 

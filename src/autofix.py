@@ -19,7 +19,8 @@ if __name__ == '__main__':
     if not path.endswith(".h") and not path.endswith(".cpp"):
         raise Exception("extension type not supported")
 
-    _, _, new_data = review.verify(path=path, regex_order=regex_order)
+    changed, _, new_data = review.verify(path=path, regex_order=regex_order)
 
-    with open(path, "w") as data:
-        data.writelines(new_data)
+    if changed:
+        with open(path, "w") as data:
+            data.writelines(new_data)
