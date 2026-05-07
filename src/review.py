@@ -30,6 +30,35 @@ def is_using_namespace(text):
     return True
 
 
+def is_preprocessor_directive(text):
+    """Detecta se uma linha é uma diretiva de pré-processador de controle de fluxo"""
+    stripped = text.strip()
+    return bool(re.match(r'#\s*(ifdef|ifndef|elif|elseif|else|endif)', stripped))
+
+
+def get_usings_with_protection_info(lines):
+    """
+    Extrai usings e marca quais estão protegidos por diretivas de pré-processador.
+    Retorna uma lista de tuplas: (using, is_protected_by_directive)
+    """
+    usings_info = []
+    preprocessor_depth = 0
+    
+    for line in lines:
+        line_stripped = line.strip()
+        
+        if re.match(r'#\s*(ifdef|ifndef)', line_stripped):
+            preprocessor_depth += 1
+        elif re.match(r'#\s*endif', line_stripped):
+            preprocessor_depth = max(0, preprocessor_depth - 1)
+        
+        if is_using_namespace(line_stripped):
+            is_protected = preprocessor_depth > 0
+            usings_info.append((line_stripped, is_protected))
+    
+    return usings_info
+
+
 def remove_linhas_brancas_consecutivas(lista_strings):
     resultado = []
     linhas_em_branco = 0
@@ -47,6 +76,10 @@ def remove_linhas_brancas_consecutivas(lista_strings):
 
 
 def adjust_order(using_list, regex_order):
+    """
+    Reordena uma lista de usings conforme as regras de regex_order.
+    Os usings protegidos por diretivas de pré-processador já devem ter sido removidos.
+    """
     using_list_ordered = []
     regex_order_copy = []
     regex_order_copy.extend(regex_order)
@@ -95,44 +128,74 @@ def get_last_include_position(lines):
 
 
 def check_order_changed(lines_changed, lines_original):
+    """
+    Verifica se a ordem dos usings mudou, ignorando usings protegidos por #ifdef.
+    """
     lines_using_changed = []
     lines_using_original = []
+    
+    usings_info_original = get_usings_with_protection_info(lines_original)
+    usings_info_changed = get_usings_with_protection_info(lines_changed)
 
-    for line in lines_original:
-        line = line.strip()
+    for using, is_protected in usings_info_original:
+        if not is_protected:
+            lines_using_original.append(using)
 
-        if is_using_namespace(line):
-            lines_using_original.append(line)
-
-    for line in lines_changed:
-        line = line.strip()
-
-        if is_using_namespace(line):
-            lines_using_changed.append(line)
+    for using, is_protected in usings_info_changed:
+        if not is_protected:
+            lines_using_changed.append(using)
 
     return lines_using_original != lines_using_changed
 
 
 def verify(path, regex_order):
+    """
+    Verifica e reordena usings, mantendo protegidos por #ifdef no lugar.
+    Retorna: (changed, usings_ordered, lines_fixed)
+    """
     with open(path, 'r') as data:
         lines = data.readlines()
 
-    usings = []
+    usings_info = get_usings_with_protection_info(lines)
+    
+    usings_protected = []
+    usings_normal = []
+    
+    for using, is_protected in usings_info:
+        if is_protected:
+            usings_protected.append(using)
+        else:
+            usings_normal.append(using)
+    
+    usings_normal = remove_duplicate_usings(usings_normal)
+    
     lines_fix = []
-
+    preprocessor_depth = 0
+    
     for line in lines:
         line_stripped = line.strip()
-
-        if is_using_namespace(line_stripped):
-            usings.append(line_stripped)
+        
+        if re.match(r'#\s*(ifdef|ifndef)', line_stripped):
+            preprocessor_depth += 1
+            lines_fix.append(line)
+        elif re.match(r'#\s*endif', line_stripped):
+            preprocessor_depth = max(0, preprocessor_depth - 1)
+            lines_fix.append(line)
+        elif re.match(r'#\s*(elif|elseif)', line_stripped):
+            lines_fix.append(line)
+        elif re.match(r'#\s*else', line_stripped):
+            lines_fix.append(line)
+        elif is_using_namespace(line_stripped):
+            if preprocessor_depth == 0:
+                continue
+            else:
+                lines_fix.append(line)
         else:
             lines_fix.append(line)
 
-    usings = remove_duplicate_usings(usings)
+    usings_ordered = adjust_order(usings_normal, regex_order)
 
     pos_last_include = get_last_include_position(lines_fix) + 1
-    usings_ordered = adjust_order(usings, regex_order)
-
     lines_fix[pos_last_include:pos_last_include] = usings_ordered
     lines_fix = remove_linhas_brancas_consecutivas(lines_fix)
 
