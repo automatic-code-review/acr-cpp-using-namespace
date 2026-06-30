@@ -119,14 +119,29 @@ def verify(path, regex_order):
 
     usings = []
     lines_fix = []
+    conditional_depth = 0
+
+    conditional_start_regex = r'^#\s*(if|ifdef|ifndef)\b'
+    conditional_end_regex = r'^#\s*endif\b'
 
     for line in lines:
         line_stripped = line.strip()
 
-        if is_using_namespace(line_stripped):
+        # Keep everything inside preprocessor conditionals untouched.
+        if re.match(conditional_end_regex, line_stripped):
+            conditional_depth = max(0, conditional_depth - 1)
+            lines_fix.append(line)
+            continue
+
+        inside_conditional = conditional_depth > 0
+
+        if (not inside_conditional) and is_using_namespace(line_stripped):
             usings.append(line_stripped)
         else:
             lines_fix.append(line)
+
+        if re.match(conditional_start_regex, line_stripped):
+            conditional_depth += 1
 
     usings = remove_duplicate_usings(usings)
 
