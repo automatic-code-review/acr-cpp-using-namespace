@@ -82,6 +82,13 @@ class TestReviewCall(unittest.TestCase):
 
         self.assertEqual(comments, [])
 
+    def test_review_deveria_ignorar_using_dentro_de_ifdef_v2(self):
+        config = self.build_config("sample_input_ifdef_bug_v2.cpp")
+
+        comments = review_module.review(config)
+
+        self.assertEqual(comments, [])
+
     def test_review_deveria_ignorar_using_dentro_de_elif(self):
         config = self.build_config("sample_input_elif_bug.cpp")
 

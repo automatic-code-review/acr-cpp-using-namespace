@@ -120,6 +120,7 @@ def verify(path, regex_order):
     usings = []
     lines_fix = []
     conditional_depth = 0
+    first_global_using_insert_pos = None
 
     conditional_start_regex = r'^#\s*(if|ifdef|ifndef)\b'
     conditional_end_regex = r'^#\s*endif\b'
@@ -136,6 +137,8 @@ def verify(path, regex_order):
         inside_conditional = conditional_depth > 0
 
         if (not inside_conditional) and is_using_namespace(line_stripped):
+            if first_global_using_insert_pos is None:
+                first_global_using_insert_pos = len(lines_fix)
             usings.append(line_stripped)
         else:
             lines_fix.append(line)
@@ -146,9 +149,14 @@ def verify(path, regex_order):
     usings = remove_duplicate_usings(usings)
 
     pos_last_include = get_last_include_position(lines_fix) + 1
+    insert_pos = first_global_using_insert_pos
+
+    if insert_pos is None:
+        insert_pos = pos_last_include
+
     usings_ordered = adjust_order(usings, regex_order)
 
-    lines_fix[pos_last_include:pos_last_include] = usings_ordered
+    lines_fix[insert_pos:insert_pos] = usings_ordered
     lines_fix = remove_linhas_brancas_consecutivas(lines_fix)
 
     if check_order_changed(lines_fix, lines):

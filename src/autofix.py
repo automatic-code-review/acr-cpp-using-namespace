@@ -1,7 +1,25 @@
 import argparse
 import json
 
-import review
+try:
+    from src import review
+except ImportError:
+    import review
+
+
+def autofix_file(path, config):
+    regex_order = config['regexOrder']
+
+    if not path.endswith((".h", ".cpp", ".hpp")):
+        raise Exception("extension type not supported")
+
+    changed, _, new_data = review.verify(path=path, regex_order=regex_order)
+
+    if changed:
+        with open(path, "w") as data:
+            data.writelines(new_data)
+
+    return changed
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -13,13 +31,4 @@ if __name__ == '__main__':
     with open(args.CONFIG, 'r') as data:
         config = json.load(data)
 
-    path = args.PATH
-    regex_order = config['regexOrder']
-
-    if not path.endswith(".h") and not path.endswith(".cpp"):
-        raise Exception("extension type not supported")
-
-    _, _, new_data = review.verify(path=path, regex_order=regex_order)
-
-    with open(path, "w") as data:
-        data.writelines(new_data)
+    autofix_file(path=args.PATH, config=config)
