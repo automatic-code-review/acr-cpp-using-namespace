@@ -6,6 +6,9 @@ on:
       - "**"
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   tests-and-coverage:
     runs-on: ubuntu-latest
@@ -25,6 +28,14 @@ jobs:
           pip install -r requirements.txt coverage
 
       - name: Run tests with coverage
+        id: coverage
         run: |
           python -m coverage run --rcfile=.coveragerc -m unittest discover -s tests -p 'test_*.py' -v
-          python -m coverage report --rcfile=.coveragerc --fail-under=90 -m
+          python -m coverage report --rcfile=.coveragerc --fail-under=90 -m | tee coverage_report.txt
+          COVERAGE_PERCENT=$(awk '/^TOTAL/ {print $NF}' coverage_report.txt)
+          echo "coverage_percent=$COVERAGE_PERCENT" >> "$GITHUB_OUTPUT"
+
+      - name: Publish coverage in job summary
+        run: |
+          echo "### Coverage Result" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Total: **${{ steps.coverage.outputs.coverage_percent }}**" >> "$GITHUB_STEP_SUMMARY"
