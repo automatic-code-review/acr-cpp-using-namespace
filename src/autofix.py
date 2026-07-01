@@ -3,7 +3,7 @@ import json
 
 try:
     from src import review
-except ImportError:
+except ImportError:  # pragma: no cover
     import review
 
 
@@ -21,7 +21,8 @@ def autofix_file(path, config):
 
     return changed
 
-if __name__ == '__main__':
+
+if __name__ == '__main__':  # pragma: no cover
     parser = argparse.ArgumentParser()
     parser.add_argument('--PATH', type=str, help='Path')
     parser.add_argument('--CONFIG', type=str, help='Config')
