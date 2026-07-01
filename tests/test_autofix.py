@@ -20,6 +20,20 @@ class TestAutofix(unittest.TestCase):
             ]
         }
 
+    def build_config_std_company_project(self):
+        return {
+            "regexOrder": [
+                {
+                    "orderType": "individual",
+                    "regex": [
+                        r"^using std::.*;$",
+                        r"^using company::.*;$",
+                        r"^using project::.*;$",
+                    ],
+                }
+            ]
+        }
+
     def fixture_path(self, name):
         return os.path.join("tests", "fixtures", name)
 
@@ -53,6 +67,88 @@ class TestAutofix(unittest.TestCase):
 
         with open(expected_path, "r") as data:
             expected_content = data.read()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_path = os.path.join(tmpdir, "sample_input.cpp")
+
+            with open(temp_path, "w") as data:
+                data.write(original_content)
+
+            changed = autofix_module.autofix_file(path=temp_path, config=config)
+
+            with open(temp_path, "r") as data:
+                changed_content = data.read()
+
+        self.assertTrue(changed)
+        self.assertEqual(changed_content, expected_content)
+
+    def test_autofix_ordena_arquivo_header_desordenado(self):
+        config = self.build_config_std_company_project()
+        
+        original_content = (
+            "#ifndef MYCLASS_H\n"
+            "#define MYCLASS_H\n"
+            "\n"
+            "using project::Widget;\n"
+            "using std::vector;\n"
+            "using company::Alpha;\n"
+            "using std::string;\n"
+            "\n"
+            "class Foo {};\n"
+            "\n"
+            "#endif\n"
+        )
+        expected_content = (
+            "#ifndef MYCLASS_H\n"
+            "#define MYCLASS_H\n"
+            "\n"
+            "using std::string;\n"
+            "using std::vector;\n"
+            "using company::Alpha;\n"
+            "using project::Widget;\n"
+            "\n"
+            "class Foo {};\n"
+            "\n"
+            "#endif\n"
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_path = os.path.join(tmpdir, "sample_input.h")
+
+            with open(temp_path, "w") as data:
+                data.write(original_content)
+
+            changed = autofix_module.autofix_file(path=temp_path, config=config)
+
+            with open(temp_path, "r") as data:
+                changed_content = data.read()
+
+        self.assertTrue(changed)
+        self.assertEqual(changed_content, expected_content)
+
+    def test_autofix_ordena_arquivo_cpp_desordenado(self):
+        config = self.build_config_std_company_project()
+
+        original_content = (
+            "#include <vector>\n"
+            "\n"
+            "using project::Widget;\n"
+            "using std::vector;\n"
+            "using company::Alpha;\n"
+            "using std::string;\n"
+            "\n"
+            "int main() { return 0; }\n"
+        )
+        expected_content = (
+            "#include <vector>\n"
+            "\n"
+            "using std::string;\n"
+            "using std::vector;\n"
+            "using company::Alpha;\n"
+            "using project::Widget;\n"
+            "\n"
+            "int main() { return 0; }\n"
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             temp_path = os.path.join(tmpdir, "sample_input.cpp")

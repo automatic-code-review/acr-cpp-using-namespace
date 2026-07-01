@@ -113,6 +113,71 @@ def check_order_changed(lines_changed, lines_original):
     return lines_using_original != lines_using_changed
 
 
+def get_top_level_header_guard_range(lines):
+    ifndef_regex = re.compile(r'^#\s*ifndef\s+([A-Za-z_][A-Za-z0-9_]*)\b')
+    define_regex = re.compile(r'^#\s*define\s+([A-Za-z_][A-Za-z0-9_]*)\b')
+    conditional_start_regex = re.compile(r'^#\s*(if|ifdef|ifndef)\b')
+    conditional_end_regex = re.compile(r'^#\s*endif\b')
+
+    first_content_idx = None
+    for idx, line in enumerate(lines):
+        if line.strip() != "":
+            first_content_idx = idx
+            break
+
+    if first_content_idx is None:
+        return None
+
+    ifndef_match = ifndef_regex.match(lines[first_content_idx].strip())
+    if not ifndef_match:
+        return None
+
+    macro_name = ifndef_match.group(1)
+
+    define_idx = None
+    for idx in range(first_content_idx + 1, len(lines)):
+        stripped = lines[idx].strip()
+        if stripped == "":
+            continue
+
+        define_match = define_regex.match(stripped)
+        if define_match and define_match.group(1) == macro_name:
+            define_idx = idx
+        break
+
+    if define_idx is None:
+        return None
+
+    depth = 1
+    guard_end_idx = None
+
+    for idx in range(first_content_idx + 1, len(lines)):
+        stripped = lines[idx].strip()
+
+        if conditional_start_regex.match(stripped):
+            depth += 1
+
+        if conditional_end_regex.match(stripped):
+            depth -= 1
+            if depth == 0:
+                guard_end_idx = idx
+                break
+
+    if guard_end_idx is None:
+        return None
+
+    last_content_idx = None
+    for idx in range(len(lines) - 1, -1, -1):
+        if lines[idx].strip() != "":
+            last_content_idx = idx
+            break
+
+    if last_content_idx != guard_end_idx:
+        return None
+
+    return first_content_idx, guard_end_idx
+
+
 def verify(path, regex_order):
     with open(path, 'r') as data:
         lines = data.readlines()
@@ -124,8 +189,9 @@ def verify(path, regex_order):
 
     conditional_start_regex = r'^#\s*(if|ifdef|ifndef)\b'
     conditional_end_regex = r'^#\s*endif\b'
+    header_guard_range = get_top_level_header_guard_range(lines)
 
-    for line in lines:
+    for idx, line in enumerate(lines):
         line_stripped = line.strip()
 
         # Keep everything inside preprocessor conditionals untouched.
@@ -135,6 +201,11 @@ def verify(path, regex_order):
             continue
 
         inside_conditional = conditional_depth > 0
+        if header_guard_range is not None:
+            guard_start, guard_end = header_guard_range
+            inside_header_guard_body = guard_start < idx < guard_end
+            if inside_header_guard_body:
+                inside_conditional = (conditional_depth - 1) > 0
 
         if (not inside_conditional) and is_using_namespace(line_stripped):
             if first_global_using_insert_pos is None:
